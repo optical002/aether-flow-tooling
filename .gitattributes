@@ -1,0 +1,2 @@
+build_tools/unfinished_graalwm-build_tool/graalvm/lib/static/windows-amd64/jvm.lib filter=lfs diff=lfs merge=lfs -text
+build_tools/unfinished_graalwm-build_tool/graalvm/lib/modules filter=lfs diff=lfs merge=lfs -text
