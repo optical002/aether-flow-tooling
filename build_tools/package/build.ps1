@@ -1,4 +1,25 @@
+#!/usr/bin/env pwsh
 # PowerShell script to build a fat JAR using SBT assembly
+
+# Get all command line arguments
+$scriptArgs = $args
+
+# Default value for project name
+$Project = $null
+
+# Parse arguments manually
+for ($i = 0; $i -lt $scriptArgs.Length; $i++) {
+    if (($scriptArgs[$i] -eq "--project" -or $scriptArgs[$i] -eq "-p") -and $i+1 -lt $scriptArgs.Length) {
+        $Project = $scriptArgs[$i+1]
+        $i++  # Skip the next argument since we just processed it
+    }
+}
+
+if (-not $Project) {
+    Write-Host "No project specified, using default JAR pattern."
+} else {
+    Write-Host "Building project: $Project"
+}
 
 $baseDir = $PSScriptRoot
 $buildArtifactsDir = Join-Path -Path $baseDir -ChildPath "build_artifacts"
@@ -51,7 +72,13 @@ try {
     $env:SBT_OPTS = "-Dsbt.supershell=false -Dsbt.color=false -Dsbt.log.noformat=true"
     
     # Use Get-Content to pipe the input to SBT
-    $sbtProcess = Get-Content -Path $inputScript | sbt -batch clean assembly
+    if ($Project) {
+        Write-Host "Running SBT with project-specific assembly: $Project/assembly"
+        $sbtProcess = Get-Content -Path $inputScript | sbt -batch clean "$Project/assembly"
+    } else {
+        Write-Host "Running SBT with generic assembly command"
+        $sbtProcess = Get-Content -Path $inputScript | sbt -batch clean assembly
+    }
     $exitCode = $LASTEXITCODE
     
     if ($exitCode -ne 0) {
@@ -67,7 +94,13 @@ try {
 
 # Find and copy the JAR file to the new build directory
 Write-Host "Finding and copying the assembled JAR file..."
-$jarFiles = Get-ChildItem -Path "$baseDir\target" -Filter "*assembly*.jar" -Recurse
+$jarPattern = if ($Project) { "$Project-assembly*.jar" } else { "*assembly*.jar" }
+Write-Host "Using JAR pattern: $jarPattern"
+
+# Search path depends on whether project is specified
+$searchPath = if ($Project) { $baseDir } else { "$baseDir\target" }
+Write-Host "Searching for JAR in: $searchPath"
+$jarFiles = Get-ChildItem -Path $searchPath -Filter $jarPattern -Recurse
 if ($jarFiles.Count -gt 0) {
     $jarFile = $jarFiles[0]
     $destJarPath = Join-Path -Path $newBuildDir -ChildPath $jarFile.Name
